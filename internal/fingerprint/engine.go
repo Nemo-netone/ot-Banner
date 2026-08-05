@@ -87,6 +87,9 @@ func LoadEngine(path string) (*Engine, error) {
 		if err != nil {
 			return nil, fmt.Errorf("os hint %q: %w", hint.Name, err)
 		}
+		if hint.ConfidenceBonus < 0 || hint.ConfidenceBonus > 1 {
+			return nil, fmt.Errorf("os hint %q confidence bonus must be between 0 and 1", hint.Name)
+		}
 		hint.compiled = compiled
 	}
 	sort.SliceStable(file.Rules, func(i, j int) bool {
@@ -119,7 +122,13 @@ func (e *Engine) Identify(record ScanRecord) FingerprintResult {
 		}
 		version := capture(view.matchText, match, rule.compiled, rule.VersionGroup)
 		osHint := capture(view.matchText, match, rule.compiled, rule.OSGroup)
-		candidate := candidate{rule: rule, version: version, osHint: osHint, score: rule.Confidence}
+		candidate := candidate{
+			rule:        rule,
+			version:     version,
+			osHint:      osHint,
+			score:       rule.Confidence,
+			portMatched: containsPort(rule.PortHint, record.Port),
+		}
 		if best == nil || candidate.betterThan(best) {
 			best = &candidate
 		}
@@ -133,6 +142,7 @@ func (e *Engine) Identify(record ScanRecord) FingerprintResult {
 	for _, hint := range e.osHints {
 		if result.OSHint == "" && hint.compiled.MatchString(view.printable) {
 			result.OSHint = hint.Name
+			result.Confidence = clamp(result.Confidence + hint.ConfidenceBonus)
 		}
 	}
 	return result
@@ -142,11 +152,15 @@ type candidate struct {
 	rule            *Rule
 	version, osHint string
 	score           float64
+	portMatched     bool
 }
 
 func (c *candidate) betterThan(other *candidate) bool {
 	if c.rule.Priority != other.rule.Priority {
 		return c.rule.Priority > other.rule.Priority
+	}
+	if c.portMatched != other.portMatched {
+		return c.portMatched
 	}
 	if c.score != other.score {
 		return c.score > other.score
@@ -212,4 +226,13 @@ func clamp(value float64) float64 {
 		return 1
 	}
 	return value
+}
+
+func containsPort(ports []int, port int) bool {
+	for _, candidate := range ports {
+		if candidate == port {
+			return true
+		}
+	}
+	return false
 }

@@ -25,6 +25,7 @@ func main() {
 	if err != nil {
 		fatal("read input: %v", err)
 	}
+	data = bytes.TrimPrefix(data, []byte{0xEF, 0xBB, 0xBF})
 	var records []fingerprint.ScanRecord
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	if err := decoder.Decode(&records); err != nil {

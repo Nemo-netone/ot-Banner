@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -66,6 +66,10 @@ func routes(engine *fingerprint.Engine, maxBody, maxBatch int) http.Handler {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
+		if !engine.Ready() {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+			return
+		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("/fingerprint", func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +77,8 @@ func routes(engine *fingerprint.Engine, maxBody, maxBatch int) http.Handler {
 			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 			return
 		}
-		if contentType := r.Header.Get("Content-Type"); contentType != "" && !strings.HasPrefix(strings.ToLower(contentType), "application/json") {
+		mediaType, _, contentTypeErr := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if contentTypeErr != nil || mediaType != "application/json" {
 			writeError(w, http.StatusUnsupportedMediaType, "content type must be application/json")
 			return
 		}
@@ -81,6 +86,11 @@ func routes(engine *fingerprint.Engine, maxBody, maxBatch int) http.Handler {
 		decoder := json.NewDecoder(r.Body)
 		var records []fingerprint.ScanRecord
 		if err := decoder.Decode(&records); err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				writeError(w, http.StatusRequestEntityTooLarge, "request body exceeds limit")
+				return
+			}
 			writeError(w, http.StatusBadRequest, "invalid JSON request")
 			return
 		}

@@ -1,5 +1,3 @@
-﻿version: '3.8'
-
 services:
   server:
     build:
@@ -13,14 +11,7 @@ services:
     networks:
       - backend
     healthcheck:
-      test:
-        [
-          "CMD",
-          "/app/server",
-          "healthcheck",
-          "--url",
-          "http://127.0.0.1:8080/health"
-        ]
+      test: ["CMD", "/app/server", "healthcheck", "--url", "http://127.0.0.1:8080/health"]
       interval: 5s
       timeout: 2s
       retries: 10

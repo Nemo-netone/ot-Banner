@@ -22,7 +22,7 @@
 
 ### `POST /fingerprint`
 
-请求体必须是 JSON 数组：
+请求体必须是 `application/json`，且内容必须是 JSON 数组：
 
 ```json
 [
@@ -32,7 +32,7 @@
 
 返回字段固定为 `ip`、`port`、`protocol`、`product`、`version`、`os_hint`、`confidence`。
 
-请求限制：默认最大请求体 8 MiB、最大批量 1000 条、单条 Banner 64 KiB。方法、Content-Type、JSON 尾部数据和超限请求均有明确 HTTP 错误码。
+请求限制：默认最大请求体 8 MiB、最大批量 1000 条、单条 Banner 64 KiB。方法、Content-Type、JSON 尾部数据和超限请求均有明确 HTTP 错误码；缺少 Content-Type 也会返回 `415`。
 
 ## 本地运行
 
@@ -63,7 +63,7 @@ Client 通过 Compose 服务名 `http://server:8080` 访问 Server。容器使�
 如需从宿主机调用，可临时执行：
 
 ```bash
-docker compose run --rm -p 127.0.0.1:8080:8080 server
+docker compose -f compose.yaml -f compose.dev.yaml up -d --build
 ```
 
 ## 规则
@@ -76,7 +76,7 @@ docker compose run --rm -p 127.0.0.1:8080:8080 server
 - `pattern`：Go 正则表达式。
 - `version_group`、`os_group`：命名捕获组。
 - `confidence`：基础置信度，最终值始终限制在 `[0,1]`。
-- `port_hint`：同等候选的轻量加分。
+- `port_hint`：同优先级候选排序时的轻量辅助，不会单独决定协议。
 - `os_hints`：独立 OS 提示规则。
 
 标准 JSON 不支持 `\\xNN` 转义。推荐使用 `\\u0000`，或使用：

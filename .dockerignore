@@ -5,4 +5,4 @@ README.md.bak
 testdata
 *_test.go
 vendor/
-'*.log'
+*.log

@@ -6,7 +6,7 @@
     {"id":"http-apache","priority":100,"protocol":"HTTP","product":"Apache","pattern":"(?im)^Server:\\s*Apache(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?","version_group":"version","confidence":0.90,"port_hint":[80,443,8080,8443]},
     {"id":"http-jetty","priority":100,"protocol":"HTTP","product":"Jetty","pattern":"(?im)^Server:\\s*Jetty(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?","version_group":"version","confidence":0.85},
     {"id":"http-iis","priority":100,"protocol":"HTTP","product":"Microsoft-IIS","pattern":"(?im)^Server:\\s*Microsoft-IIS(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?","version_group":"version","confidence":0.90},
-    {"id":"mysql-handshake","priority":100,"protocol":"MySQL","product":"MySQL","pattern":"(?:^|[\\x00-\\x1f])(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+(?:[-A-Za-z0-9._]*)?)\\x00","version_group":"version","confidence":0.90,"port_hint":[3306]},
+    {"id":"mysql-handshake","priority":100,"protocol":"MySQL","product":"MySQL","pattern":"(?s)^.{4}\\x0a(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+(?:[-A-Za-z0-9._]*)?)\\x00","version_group":"version","confidence":0.90,"port_hint":[3306]},
     {"id":"redis-response","priority":90,"protocol":"Redis","product":"Redis","pattern":"(?i)^(?:-ERR|-NOAUTH|\\+PONG)","confidence":0.80,"port_hint":[6379]},
     {"id":"ftp-proftpd","priority":100,"protocol":"FTP","product":"ProFTPD","pattern":"(?i)^220.*ProFTPD(?:\\s+(?P<version>[0-9][0-9A-Za-z._-]*))?","version_group":"version","confidence":0.90,"port_hint":[21]},
     {"id":"ftp-vsftpd","priority":100,"protocol":"FTP","product":"vsFTPd","pattern":"(?i)^220.*vsFTPd\\s+(?P<version>[0-9][0-9A-Za-z._-]*)","version_group":"version","confidence":0.90,"port_hint":[21]},
