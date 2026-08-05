@@ -1,0 +1,88 @@
+﻿version: 1
+
+rules:
+  - id: ssh-openssh
+    priority: 100
+    protocol: SSH
+    product: OpenSSH
+    pattern: 'SSH-(?:1\.99|2\.0)-OpenSSH[_/-](?P<version>[0-9][0-9A-Za-z._-]*)'
+    version_group: version
+    confidence: 0.95
+    port_hint: [22]
+
+  - id: http-nginx
+    priority: 100
+    protocol: HTTP
+    product: nginx
+    pattern: '(?im)^Server:\s*nginx(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?'
+    version_group: version
+    confidence: 0.90
+    port_hint: [80, 443, 8080, 8443]
+
+  - id: http-apache
+    priority: 100
+    protocol: HTTP
+    product: Apache
+    pattern: '(?im)^Server:\s*Apache(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?'
+    version_group: version
+    confidence: 0.90
+    port_hint: [80, 443, 8080, 8443]
+
+  - id: http-jetty
+    priority: 100
+    protocol: HTTP
+    product: Jetty
+    pattern: '(?im)^Server:\s*Jetty(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?'
+    version_group: version
+    confidence: 0.85
+
+  - id: http-iis
+    priority: 100
+    protocol: HTTP
+    product: Microsoft-IIS
+    pattern: '(?im)^Server:\s*Microsoft-IIS(?:/(?P<version>[0-9][0-9A-Za-z._-]*))?'
+    version_group: version
+    confidence: 0.90
+
+  - id: redis
+    priority: 90
+    protocol: Redis
+    product: Redis
+    pattern: '(?i)^(?:-ERR|-NOAUTH|\+PONG)'
+    confidence: 0.80
+    port_hint: [6379]
+
+  - id: ftp-proftpd
+    priority: 100
+    protocol: FTP
+    product: ProFTPD
+    pattern: '(?i)^220.*ProFTPD(?:\s+(?P<version>[0-9][0-9A-Za-z._-]*))?'
+    version_group: version
+    confidence: 0.90
+    port_hint: [21]
+
+  - id: ftp-vsftpd
+    priority: 100
+    protocol: FTP
+    product: vsFTPd
+    pattern: '(?i)^220.*vsFTPd\s+(?P<version>[0-9][0-9A-Za-z._-]*)'
+    version_group: version
+    confidence: 0.90
+    port_hint: [21]
+
+  - id: ftp-pureftpd
+    priority: 100
+    protocol: FTP
+    product: Pure-FTPd
+    pattern: '(?i)^220.*Pure-FTPd'
+    confidence: 0.85
+    port_hint: [21]
+
+  - id: mysql
+    priority: 100
+    protocol: MySQL
+    product: MySQL
+    pattern: '(?:^|[\x00-\x1f])(?P<version>[0-9]+\.[0-9]+\.[0-9]+(?:[-A-Za-z0-9._]*)?)\x00'
+    version_group: version
+    confidence: 0.90
+    port_hint: [3306]
