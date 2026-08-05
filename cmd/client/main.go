@@ -1,82 +1,66 @@
-﻿package main
+package main
 
 import (
 	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"time"
+
+	"banner-fingerprint/internal/fingerprint"
 )
-
-type ScanRecord struct {
-	IP     string `json:"ip"`
-	Port   int    `json:"port"`
-	Banner string `json:"banner"`
-}
-
-type FingerprintResult struct {
-	IP         string  `json:"ip"`
-	Port       int     `json:"port"`
-	Protocol   string  `json:"protocol"`
-	Product    string  `json:"product"`
-	Version    string  `json:"version"`
-	OSHint     string  `json:"os_hint"`
-	Confidence float64 `json:"confidence"`
-}
 
 func main() {
 	file := flag.String("file", "", "input JSON file")
 	server := flag.String("server", "http://localhost:8080", "server URL")
-	timeout := flag.Duration("timeout", 10*time.Second, "request timeout")
+	timeout := flag.Duration("timeout", 15*time.Second, "request timeout")
 	flag.Parse()
-
 	if *file == "" {
-		fmt.Println("Usage: client --file input.json --server http://server:8080")
-		os.Exit(1)
+		fatal("--file is required")
 	}
-
 	data, err := os.ReadFile(*file)
 	if err != nil {
-		fmt.Printf("read file: %v\n", err)
-		os.Exit(1)
+		fatal("read input: %v", err)
 	}
-
-	var records []ScanRecord
-	if err := json.Unmarshal(data, &records); err != nil {
-		fmt.Printf("unmarshal: %v\n", err)
-		os.Exit(1)
+	var records []fingerprint.ScanRecord
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	if err := decoder.Decode(&records); err != nil {
+		fatal("invalid input JSON: %v", err)
 	}
-
-	client := &http.Client{Timeout: *timeout}
-	url := *server + "/fingerprint"
-
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		fatal("input must contain one JSON array")
+	}
 	body, err := json.Marshal(records)
 	if err != nil {
-		fmt.Printf("marshal: %v\n", err)
-		os.Exit(1)
+		fatal("encode input: %v", err)
 	}
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	request, err := http.NewRequest(http.MethodPost, *server+"/fingerprint", bytes.NewReader(body))
 	if err != nil {
-		fmt.Printf("new request: %v\n", err)
-		os.Exit(1)
+		fatal("create request: %v", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := client.Do(req)
+	request.Header.Set("Content-Type", "application/json")
+	response, err := (&http.Client{Timeout: *timeout}).Do(request)
 	if err != nil {
-		fmt.Printf("request: %v\n", err)
-		os.Exit(1)
+		fatal("request server: %v", err)
 	}
-	defer resp.Body.Close()
-
-	var results []FingerprintResult
-	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil {
-		fmt.Printf("decode: %v\n", err)
-		os.Exit(1)
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		message, _ := io.ReadAll(io.LimitReader(response.Body, 4*1024))
+		fatal("server returned %s: %s", response.Status, bytes.TrimSpace(message))
 	}
-
-	json.NewEncoder(os.Stdout).Encode(results)
+	var results []fingerprint.FingerprintResult
+	if err := json.NewDecoder(response.Body).Decode(&results); err != nil {
+		fatal("decode response: %v", err)
+	}
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(results); err != nil {
+		fatal("write output: %v", err)
+	}
 }
+
+func fatal(format string, args ...any) { fmt.Fprintf(os.Stderr, format+"\n", args...); os.Exit(1) }

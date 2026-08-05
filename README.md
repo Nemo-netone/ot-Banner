@@ -1,164 +1,96 @@
 # Banner 指纹识别系统
 
-## 任务说明
+一个 Go 实现的批量 Banner 指纹识别系统，采用独立 Client + Server 架构。Server 提供 HTTP API，Client 读取本地 JSON 并提交识别；识别规则存放在独立 JSON 文件中，服务启动时校验并编译。
 
-使用 Golang 语言开发一个 Banner 指纹识别系统，能力为接收一批网络扫描原始数据（ip、port、banner），识别出对应的协议、软件与版本信息，并以 client + server 架构、Docker Compose 一键启动的方式交付。系统输出的识别深度至少要达到示例所示。
+## 能力
 
-## 架构说明
+- 识别 SSH/OpenSSH、HTTP/nginx/Apache/Jetty/Microsoft-IIS、MySQL、Redis、FTP。
+- 提取产品版本和 Banner 中显式出现的 Ubuntu、Debian、CentOS、Windows 提示。
+- 支持非标准端口，端口只作为候选加分，不作为唯一识别依据。
+- 无法识别时返回稳定的 `protocol: "unknown"`，不会因为单条异常输入导致整批失败。
+- 支持 `banner_base64` 传递二进制 Banner，也兼容文本中的 `\\xNN` 转义。
 
-### 整体架构
+## API
 
-```
-┌─────────────────────────────────────────────┐
-│                  Server                      │
-│  (Docker Compose 服务)                      │
-│  ┌──────────────────────────────┐           │
-│  │     API Gateway              │           │
-│  │  (Gin + Middleware)          │           │
-│  │                              │           │
-│  │  ┌──────────────────────┐    │           │
-│  │  │   Banner Service     │    │           │
-│  │  │  (Golang 指纹识别)   │    │           │
-│  │  │                      │    │           │
-│  │  └──────────────────────┘    │           │
-│  │                              │           │
-│  │  ┌──────────────────────┐    │           │
-│  │  │   Database Service   │    │           │
-│  │  │  (SQLite/Postgres)   │    │           │
-│  │  │                      │    │           │
-│  │  └──────────────────────┘    │           │
-│  └──────────────────────────────┘           │
-└─────────────────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────┐
-│                  Client                      │
-│  (CLI Tool)                                 │
-│  ┌──────────────────────┐                   │
-│  │   指纹识别命令行     │                   │
-│  │  (Golang CLI)        │                   │
-│  │                      │                   │
-│  └──────────────────────┘                   │
-└─────────────────────────────────────────────┘
+### `GET /health`
+
+规则加载成功后返回：
+
+```json
+{"status":"ok"}
 ```
 
-### 核心组件说明
+### `POST /fingerprint`
 
-1. **Server 端**
-   - API Gateway：接收 HTTP 请求，使用 Gin 框架
-   - Banner Service：核心指纹识别逻辑，处理协议识别、软件版本判断
-   - Database Service：存储识别结果和历史数据
+请求体必须是 JSON 数组：
 
-2. **Client 端**
-   - 命令行工具：提供 `banner scan`、`banner identify` 等命令
-   - 支持批量处理网络扫描数据
+```json
+[
+  {"ip":"1.2.3.4","port":22,"banner":"SSH-2.0-OpenSSH_8.9p1 Ubuntu-3"}
+]
+```
 
-3. **Docker Compose**
-   - 一键启动包含 Server 和 Client 的完整环境
-   - 支持开发模式和生产模式
+返回字段固定为 `ip`、`port`、`protocol`、`product`、`version`、`os_hint`、`confidence`。
 
-### 数据处理流程
+请求限制：默认最大请求体 8 MiB、最大批量 1000 条、单条 Banner 64 KiB。方法、Content-Type、JSON 尾部数据和超限请求均有明确 HTTP 错误码。
 
-1. Client 接收网络扫描原始数据（ip:port:banner 格式）
-2. 通过 HTTP API 提交到 Server
-3. Server 进行协议识别、软件版本判断
-4. 返回识别结果（JSON 格式）
-5. Client 展示最终结果
+## 本地运行
 
-### 输出要求
-
-识别深度至少达到示例所示（具体示例请参考后续提供的测试数据格式）。
-
-## 开发命令
-
-### 项目初始化
 ```bash
-# 克隆项目（如果需要）
-git clone <project-url> banner-fingerprint
-cd banner-fingerprint/Banner
-
-# 初始化 Go 模块
-go mod init github.com/yourname/banner-fingerprint
-go mod tidy
+go run ./cmd/server
+go run ./cmd/client --file testdata/input.json --server http://localhost:8080
 ```
 
-### 开发命令
+也可以先构建：
+
 ```bash
-# 运行服务器（开发模式）
-go run cmd/server/main.go
-
-# 运行客户端
-go run cmd/client/main.go
-
-# 构建所有二进制文件
-go build -o bin/ ./cmd/...
-
-# 运行测试
-go test ./... -v
-
-# 运行特定测试
-go test ./internal/fingerprint -v -run TestProtocolIdentification
-
-# 格式化代码
-go fmt ./...
-gofmt -s -w .
-
-# 静态检查
-golangci-lint run
-
-# 编译为 Docker 镜像
-docker build -t banner-fingerprint/server .
+go build -o bin/server ./cmd/server
+go build -o bin/client ./cmd/client
 ```
 
-### Docker Compose
+## Docker Compose
+
+生产 Compose 默认只把 Server 放在内部网络，不发布宿主机端口：
+
 ```bash
-# 启动完整服务
-docker-compose up -d
-
-# 停止服务
-docker-compose down
-
-# 查看日志
-docker-compose logs -f
-
-# 进入容器
-docker-compose exec server bash
+docker compose up -d --build
+docker compose ps
+docker compose --profile client run --rm client
 ```
 
-## 代码结构
+Client 通过 Compose 服务名 `http://server:8080` 访问 Server。容器使用多阶段构建、静态二进制、distroless nonroot、只读文件系统、`cap_drop: ALL`、`no-new-privileges` 和真实 HTTP 健康检查。
 
-```
-banner-fingerprint/
-├── cmd/
-│   ├── server/          # Server 端主程序
-│   │   └── main.go
-│   └── client/         # Client 端主程序
-│       └── main.go
-├── internal/
-│   ├── fingerprint/     # 指纹识别核心逻辑
-│   │   ├── protocol.go     # 协议识别
-│   │   ├── service.go      # 识别服务
-│   │   └── models/         # 数据模型
-│   ├── api/                # API 相关
-│   │   └── handler.go
-│   └── database/           # 数据库操作
-├── pkg/                    # 共享包
-│   └── utils/              # 工具函数
-├── config/                 # 配置文件
-│   └── config.yaml
-├── docker/
-│   └── compose.yml         # Docker Compose 配置文件
-└── tests/                  # 测试数据和测试用例
-    └── test_data.json
+如需从宿主机调用，可临时执行：
+
+```bash
+docker compose run --rm -p 127.0.0.1:8080:8080 server
 ```
 
-## 后续步骤
+## 规则
 
-1. 完成核心指纹识别功能（协议识别、软件版本判断）
-2. 实现 Server API 接口
-3. 开发 Client 命令行工具
-4. 编写 Docker Compose 配置
-5. 准备测试数据和测试用例
-6. 完成文档和示例运行
+规则文件为 `configs/fingerprints.json`，启动时会检查版本、ID 唯一性、必填字段、置信度、正则和命名捕获组。修改规则后重启 Server 即可生效，无需修改 Go 识别逻辑。
 
-请提供测试数据后，我将按照这个架构逐步实现。
+规则支持：
+
+- `priority`：候选优先级。
+- `pattern`：Go 正则表达式。
+- `version_group`、`os_group`：命名捕获组。
+- `confidence`：基础置信度，最终值始终限制在 `[0,1]`。
+- `port_hint`：同等候选的轻量加分。
+- `os_hints`：独立 OS 提示规则。
+
+标准 JSON 不支持 `\\xNN` 转义。推荐使用 `\\u0000`，或使用：
+
+```json
+{"banner":"","banner_base64":"FgMBAKUBAAC="}
+```
+
+## 验证
+
+```bash
+go test ./...
+go test -race ./...
+go vet ./...
+```
+
+测试覆盖规则识别、版本提取、OS hint、未知输入、非法 JSON 尾部和 Fuzz 不变量。

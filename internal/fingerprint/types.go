@@ -1,9 +1,10 @@
-﻿package fingerprint
+package fingerprint
 
 type ScanRecord struct {
-	IP     string `json:"ip"`
-	Port   int    `json:"port"`
-	Banner string `json:"banner"`
+	IP           string `json:"ip"`
+	Port         int    `json:"port"`
+	Banner       string `json:"banner"`
+	BannerBase64 string `json:"banner_base64,omitempty"`
 }
 
 type FingerprintResult struct {

@@ -4,8 +4,7 @@ FROM golang:1.23-alpine AS builder
 
 WORKDIR /src
 
-COPY go.mod go.sum ./
-RUN go mod download || true
+COPY go.mod ./
 
 COPY . .
 
@@ -27,10 +26,17 @@ FROM gcr.io/distroless/static-debian12:nonroot AS server
 WORKDIR /app
 
 COPY --from=builder /out/server /app/server
-COPY configs/fingerprints.yaml /app/configs/fingerprints.yaml
+COPY configs/fingerprints.json /app/configs/fingerprints.json
 
 USER nonroot:nonroot
 
 EXPOSE 8080
 
 ENTRYPOINT ["/app/server"]
+
+FROM gcr.io/distroless/static-debian12:nonroot AS client
+
+WORKDIR /app
+COPY --from=builder /out/client /app/client
+USER nonroot:nonroot
+ENTRYPOINT ["/app/client"]
