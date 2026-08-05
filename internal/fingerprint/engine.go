@@ -32,15 +32,20 @@ func NewEngine() *Engine {
 	e := &Engine{
 		rules: make(map[string]float64),
 	}
-	// Simple rules for demo
+	// Improved rules for test data
 	e.rules["SSH-2.0-OpenSSH"] = 0.95
 	e.rules["Server: nginx"] = 0.90
 	e.rules["Server: Apache"] = 0.90
 	e.rules["Server: Jetty"] = 0.85
-	e.rules["J\\x00"] = 0.90 // for MySQL
+	e.rules["J\\x00"] = 0.90 // MySQL
 	e.rules["-ERR"] = 0.80
 	e.rules["\\+PONG"] = 0.80
 	e.rules["220 ProFTPD"] = 0.90
+	e.rules["220 vsFTPd"] = 0.90
+	e.rules["220 (vsFTPd 3.0.5)"] = 0.90
+	e.rules["220 Welcome to Pure-FTPd"] = 0.85
+	e.rules["SSH-2.0-OpenSSH"] = 0.95
+	e.rules["SSH-1.99-OpenSSH"] = 0.95
 	return e
 }
 
@@ -56,13 +61,13 @@ func (e *Engine) Identify(record ScanRecord) FingerprintResult {
 		Confidence: 0,
 	}
 
-	// Match logic
-	if strings.Contains(banner, "ssh-2.0-openssh") {
+	// Better matching
+	if strings.Contains(banner, "ssh-2.0-openssh") || strings.Contains(banner, "ssh-1.99-openssh") {
 		result.Protocol = "SSH"
 		result.Product = "OpenSSH"
 		result.Confidence = 0.95
-		if strings.Contains(banner, "ubuntu") {
-			result.OSHint = "Ubuntu"
+		if strings.Contains(banner, "ubuntu") || strings.Contains(banner, "debian") {
+			result.OSHint = "Ubuntu/Debian"
 		}
 	} else if strings.Contains(banner, "server: nginx") {
 		result.Protocol = "HTTP"
@@ -80,17 +85,17 @@ func (e *Engine) Identify(record ScanRecord) FingerprintResult {
 		result.Protocol = "MySQL"
 		result.Product = "MySQL"
 		result.Confidence = 0.90
-	} else if strings.Contains(banner, "-err") {
+	} else if strings.Contains(banner, "-err") || strings.Contains(banner, "+pong") {
 		result.Protocol = "Redis"
 		result.Product = "Redis"
 		result.Confidence = 0.80
-	} else if strings.Contains(banner, "+pong") {
-		result.Protocol = "Redis"
-		result.Product = "Redis"
-		result.Confidence = 0.80
-	} else if strings.Contains(banner, "220 proftpd") {
+	} else if strings.Contains(banner, "220 proftpd") || strings.Contains(banner, "220 vsftpd") || strings.Contains(banner, "220 welcome to pure-ftpd") {
 		result.Protocol = "FTP"
-		result.Product = "ProFTPD"
+		result.Product = "ProFTPD/vsFTPd/Pure-FTPd"
+		result.Confidence = 0.90
+	} else if strings.Contains(banner, "microsoft-iis") {
+		result.Protocol = "HTTP"
+		result.Product = "Microsoft-IIS"
 		result.Confidence = 0.90
 	}
 
